@@ -91,8 +91,8 @@ for i in range(len(result)):
         
         if gt_points.shape[0] == 0: # 滤掉没有点的gt_box
             continue
-        print(gt_boxes_7D[i])
-        dis=np.sqrt(np.sum(gt_boxes_7D[i][:3]**2,axis=1))
+       
+        dis=np.sqrt(np.sum(gt_boxes_7D[i][:3]**2,axis=0))
         if dis>dis_thresh:
             continue
         gt_points[:, :3] -= gt_boxes_7D[i][:3]

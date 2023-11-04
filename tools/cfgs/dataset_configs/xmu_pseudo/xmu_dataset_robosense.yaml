@@ -22,7 +22,7 @@ TRAINING_CATEGORIES_MAPPING: {
 
 DATA_SPLIT: {
     'train': train,
-    'test': val
+    'test': train
 }
 
 INFO_PATH: {

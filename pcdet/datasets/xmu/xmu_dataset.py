@@ -357,7 +357,7 @@ class XMechanismUnmanned(DatasetTemplate):
                 boxes_7DoF = boxes_7DoF[existance]
                 classes = classes[existance]
         
-
+    
         input_dict = {
             # 'db_flag': "xmu_%s" % self.sensor,
             'frame_id': self.sample_idx_list[index],
