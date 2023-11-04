@@ -59,7 +59,7 @@ source_sensor=sensors[int(input())]
 print("target sensor: 0:ouster,1:robosense,2:hesai")
 target_sensor=sensors[int(input())]
 split="train"
-score_threshold=0.9
+score_dic={'Car':0.9,'Truck':0.7,'Pedestrian':0.5,'Cyclist':0.5}
 print("source sensor:",source_sensor," target sensor:" ,target_sensor," set:",split)
 data_path='../data/xmu'
 dis_thresh=70.4
@@ -84,10 +84,23 @@ for i in range(len(result)):
     gt_boxes_7D=annos['boxes_lidar']
     gt_names = annos['name']
 
-    num_gt = gt_boxes_7D.shape[0]
-    mask=annos['score']>score_threshold
-    gt_boxes_7D=gt_boxes_7D[mask]
-    gt_names=gt_names[mask]
+    gt_boxes_7D=annos['boxes_lidar']
+    gt_names = annos['name']
+    gt_scores = annos['score']
+    # 初始化一个布尔数组，用于标记过滤后的元素
+    mask = np.zeros(len(gt_names), dtype=bool)
+
+    # 遍历所有类别名称，更新mask
+    for name in np.unique(gt_names):
+        if name in score_dic:
+            # 对于每个类别，找到该类别的所有框，并检查它们的得分是否高于阈值
+            class_mask = (gt_names == name) & (gt_scores > score_dic[name])
+            # 更新总mask
+            mask |= class_mask  # 等同于 mask = mask | class_mask
+
+    # 应用mask过滤gt_boxes_7D和gt_names
+    gt_boxes_7D = gt_boxes_7D[mask]
+    gt_names = gt_names[mask]
     num_gt = gt_boxes_7D.shape[0]
     point_indices = roiaware_pool3d_utils.points_in_boxes_cpu(
         torch.from_numpy(points[:, 0:3]), torch.from_numpy(gt_boxes_7D)
