@@ -5,7 +5,7 @@ from pypcd import pypcd
 import os
 import torch
 from pcdet.ops.roiaware_pool3d import roiaware_pool3d_utils
-root_path="../data/xmu"
+root_path="data/xmu"
 def read_pkl(pkl_path):
     with open(pkl_path, 'rb') as f:
         data = pickle.load(f)
@@ -53,7 +53,7 @@ sensor=sensors[int(input())]
 split="train"
 score_threshold=0.9
 print("sensor:",sensor," set:",split)
-data_path='../data/xmu'
+data_path='data/xmu'
 dis_thresh=70.4
 #print(result[0])
 used_classes=["Car", "Truck","Pedestrian", "Cyclist"]
@@ -71,7 +71,6 @@ for i in range(len(result)):
     idx=(info['frame_id'])
     idx['frame']=idx['frame_id']
     points = get_lidar(idx=idx, sensor=sensor, num_features=4)
-    
     annos =info
     gt_boxes_7D=annos['boxes_lidar']
     gt_names = annos['name']

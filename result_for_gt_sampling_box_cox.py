@@ -6,7 +6,7 @@ import os
 import torch
 from pcdet.ops.roiaware_pool3d import roiaware_pool3d_utils
 from scipy import stats
-root_path="../data/xmu"
+root_path="data/xmu"
 def read_pkl(pkl_path):
     with open(pkl_path, 'rb') as f:
         data = pickle.load(f)
