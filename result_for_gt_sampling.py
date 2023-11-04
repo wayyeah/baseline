@@ -47,8 +47,9 @@ def get_calib(idx, sensor):
 print("input result path:")
 result_path=input()
 result=read_pkl(result_path)
-print("input sensor:")
-sensor=input()
+print("input sensor: 0:ouster,1:robosense,2:hesai")
+sensors=["ouster","robosense","hesai"]
+sensor=sensors[int(input())]
 split="train"
 score_threshold=0.9
 print("sensor:",sensor," set:",split)
