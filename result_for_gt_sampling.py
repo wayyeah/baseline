@@ -47,30 +47,34 @@ def get_calib(idx, sensor):
 print("input result path:")
 result_path=input()
 result=read_pkl(result_path)
-print("input sensor: 0:ouster,1:robosense,2:hesai")
+print("source sensor: 0:ouster,1:robosense,2:hesai")
 sensors=["ouster","robosense","hesai"]
-sensor=sensors[int(input())]
+source_sensor=sensors[int(input())]
+print("target sensor: 0:ouster,1:robosense,2:hesai")
+target_sensor=sensors[int(input())]
+
 split="train"
 score_threshold=0.9
-print("sensor:",sensor," set:",split)
+print("source sensor:",source_sensor," target sensor:" ,target_sensor," set:",split)
+
 data_path='data/xmu'
 dis_thresh=70.4
 #print(result[0])
 used_classes=["Car", "Truck","Pedestrian", "Cyclist"]
-database_save_path = Path(data_path) / ('pseudo_gt_database_%s' % sensor if split == 'train' else 'gt_database_%s_%s' % (sensor, split))
-db_info_save_path = Path(data_path) / ('pseudo_gt_database_info_%s.pkl' % sensor if split == 'train' else 'pseudo_gt_database_info_%s_%s.pkl' % (sensor, split))
+database_save_path = Path(data_path) / ('pseudo_gt_database_%s2%s' % (source_sensor,target_sensor) if split == 'train' else 'gt_database_%s2%s_%s' % (source_sensor,target_sensor, split))
+db_info_save_path = Path(data_path) / ('pseudo_gt_database_info_%s2%s.pkl' % (source_sensor,target_sensor) if split == 'train' else 'pseudo_gt_database_info_%s2%s_%s.pkl' % (source_sensor,target_sensor, split))
 print("save Path:",database_save_path)
 print('len info when create gt_database: ', len(result))
 database_save_path.mkdir(parents=True, exist_ok=True)
 all_db_infos = {}
-print('generation gt_database for sensor: %s' % sensor)
+print('generation gt_database for sensor: %s2%s' % (source_sensor,target_sensor))
 for i in range(len(result)):
-    print('%s gt_database sample: %d/%d' % (sensor, i+1, len(result)))
+    print('%s gt_database sample: %d/%d' % (target_sensor, i+1, len(result)))
     info = result[i]
     #print(info.keys())
     idx=(info['frame_id'])
     idx['frame']=idx['frame_id']
-    points = get_lidar(idx=idx, sensor=sensor, num_features=4)
+    points = get_lidar(idx=idx, sensor=target_sensor, num_features=4)
     annos =info
     gt_boxes_7D=annos['boxes_lidar']
     gt_names = annos['name']
@@ -112,6 +116,6 @@ for i in range(len(result)):
                 all_db_infos[gt_names[i]] = [db_info]
 
 for k, v in all_db_infos.items():
-    print('sensor--%s database of %s : %d' % (sensor, k, len(v)))
+    print('sensor--%s database of %s : %d' % (target_sensor, k, len(v)))
 with open(db_info_save_path, 'wb') as f:
     pickle.dump(all_db_infos, f)
