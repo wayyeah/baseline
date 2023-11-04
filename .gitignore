@@ -7,7 +7,7 @@ data/
 venv/
 *.idea/
 *.so
-
+.pth
 *.sh
 *.pth
 *.pkl
