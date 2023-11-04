@@ -5,6 +5,7 @@ from pypcd import pypcd
 import os
 import torch
 from pcdet.ops.roiaware_pool3d import roiaware_pool3d_utils
+from scipy import stats
 root_path="../data/xmu"
 def read_pkl(pkl_path):
     with open(pkl_path, 'rb') as f:
@@ -26,6 +27,11 @@ def get_lidar(idx, sensor, num_features=4):
     pc_z = lidar.pc_data['z']
     pc_i = lidar.pc_data['intensity']
     pc_ring = lidar.pc_data['ring']
+    box_cox_lambda = {'ouster': 0.5194996882001862, 'hesai': 0.592819354971455, 'robosense': 0.5432802611595038}
+    pc_i = np.log(pc_i + 1)
+    pc_i = stats.boxcox(pc_i+1e-6, box_cox_lambda[sensor])
+    # normalize to [0, 1]
+    pc_i = ((pc_i - np.mean(pc_i))/ np.std(pc_i)) * (np.max(pc_i) - np.min(pc_i)) + np.min(pc_i)
     lidar = np.stack([pc_x, pc_y, pc_z, pc_i, pc_ring], axis=1)
     # print(lidar.shape)
     to_ego = True
@@ -56,8 +62,8 @@ data_path='../data/xmu'
 dis_thresh=70.4
 #print(result[0])
 used_classes=["Car", "Truck","Pedestrian", "Cyclist"]
-database_save_path = Path(data_path) / ('pseudo_gt_database_%s' % sensor if split == 'train' else 'gt_database_%s_%s' % (sensor, split))
-db_info_save_path = Path(data_path) / ('pseudo_gt_database_info_%s.pkl' % sensor if split == 'train' else 'pseudo_gt_database_info_%s_%s.pkl' % (sensor, split))
+database_save_path = Path(data_path) / ('pseudo_gt_database_%s_box_cox' % sensor if split == 'train' else 'gt_database_%s_%s_box_cox' % (sensor, split))
+db_info_save_path = Path(data_path) / ('pseudo_gt_database_info_%s_box_cox.pkl' % sensor if split == 'train' else 'pseudo_gt_database_info_%s_%s_box_cox.pkl' % (sensor, split))
 print("save Path:",database_save_path)
 print('len info when create gt_database: ', len(result))
 database_save_path.mkdir(parents=True, exist_ok=True)

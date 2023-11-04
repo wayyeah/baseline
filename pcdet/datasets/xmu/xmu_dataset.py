@@ -197,7 +197,6 @@ class XMechanismUnmanned(DatasetTemplate):
         pc_z = lidar.pc_data['z']
         pc_i = lidar.pc_data['intensity']
         pc_ring = lidar.pc_data['ring']
-
         # for intensity
         if self.dataset_cfg.get('BOX_COX_NORM_INTENSITY', False):
             # box_cox_lambda = {'ouster':0.529603806963828, 'hesai':0.5931315699272153, 'robosense':0.4900647247193385}
