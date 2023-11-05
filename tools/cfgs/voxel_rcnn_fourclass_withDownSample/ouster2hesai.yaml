@@ -11,7 +11,7 @@ DATA_CONFIG:
         - NAME: gt_sampling
           USE_ROAD_PLANE: False
           DB_INFO_PATH:
-              - pseudo_gt_database_info_ouster2hesai.pkl
+              - gt_database_info_ouster_70.4.pkl
           PREPARE: {
             filter_by_min_points: ['Car:20', 'Truck:20', 'Pedestrian:15', 'Cyclist:15'],
           }
