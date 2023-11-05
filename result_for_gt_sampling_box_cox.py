@@ -61,7 +61,7 @@ target_sensor=sensors[int(input())]
 split="train"
 score_dic={'Car':0.9,'Truck':0.7,'Pedestrian':0.5,'Cyclist':0.5}
 print("source sensor:",source_sensor," target sensor:" ,target_sensor," set:",split)
-data_path='../data/xmu'
+data_path='data/xmu'
 dis_thresh=70.4
 #print(result[0])
 used_classes=["Car", "Truck","Pedestrian", "Cyclist"]
