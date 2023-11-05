@@ -105,7 +105,12 @@ for i in range(len(result)):
     point_indices = roiaware_pool3d_utils.points_in_boxes_cpu(
         torch.from_numpy(points[:, 0:3]), torch.from_numpy(gt_boxes_7D)
     ).numpy() # (num_gt, num_points)
-
+    box_cox_lambda = {'ouster': 0.5194996882001862, 'hesai': 0.592819354971455, 'robosense': 0.5432802611595038}
+    
+    points[:,3] = np.log(points[:,3] + 1)
+    points[:,3] = stats.boxcox(points[:,3]+1e-6, box_cox_lambda[target_sensor])
+    # normalize to [0, 1]
+    points[:,3] = ((points[:,3]- np.mean(points[:,3]))/ np.std(points[:,3])) * (np.max(points[:,3]) - np.min(points[:,3])) + np.min(points[:,3])
     for i in range(num_gt):
         file_name = '%s_%s_%s_%d.bin' % (idx['seq'], idx['frame'], gt_names[i], i)
         file_path = database_save_path / file_name
