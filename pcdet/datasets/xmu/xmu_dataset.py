@@ -14,7 +14,32 @@ from scipy import stats
 from ...ops.roiaware_pool3d import roiaware_pool3d_utils
 from ...utils import box_utils, common_utils
 from ..dataset import DatasetTemplate
-
+def get_line_indices(xyz, vertical_fov, vertical_resolution):
+    # Number of lines
+    num_lines = int(vertical_fov / vertical_resolution)
+    
+    # Calculate the elevation angle for each point
+    r = np.sqrt(xyz[:, 0]**2 + xyz[:, 1]**2)
+    elevation_angles = np.arctan2(xyz[:, 2], r)
+    
+    # Convert elevation angles to degrees
+    elevation_angles_deg = np.degrees(elevation_angles)
+    
+    # Calculate the range of angles covered by the lines
+    min_angle = -vertical_fov / 2
+    max_angle = vertical_fov / 2
+    
+    # Normalize elevation angles to a 0 to num_lines range
+    normalized_angles = (elevation_angles_deg - min_angle) / (max_angle - min_angle) * num_lines
+    
+    # Assign points to line indices
+    line_indices = np.floor(normalized_angles).astype(int)
+    
+    # Ensure line indices are within the valid range
+    line_indices[line_indices < 0] = 0
+    line_indices[line_indices >= num_lines] = num_lines - 1
+    
+    return line_indices
 def crop_sector(points, radius_range, angle_range):
     # 计算极坐标系下的半径和角度
     r = np.sqrt(points[:, 0] ** 2 + points[:, 1] ** 2)
@@ -240,7 +265,32 @@ class XMechanismUnmanned(DatasetTemplate):
                 downsampe_prob = 0.5
                 if np.random.rand() < downsampe_prob:
                     lidar = self.bin_beam_downsample(lidar)
-
+        if sensor=="robosense":
+            if self.dataset_cfg.get('ROBOSENSE_TO_OUTSTER_DOWNSAMPLE', False):
+                ouster_points_per_line=(1024//3)
+                vertical_fov = 25.0  # 垂直视场角度
+                vertical_resolution = 0.2  # 垂直角分辨率
+                robosense_lines = int(vertical_fov / vertical_resolution)  # 线束数量
+                vertical_fov = 25
+                vertical_resolution = 0.2 
+                line_indices = get_line_indices(lidar[:,:3], vertical_fov, vertical_resolution)
+                downsampled_points = []
+                for i in range(125):
+                    mask=(line_indices==i)
+                    line_points = lidar[mask]
+                    if line_points.shape[0] >= ouster_points_per_line:
+                        sampled_indices = np.round(np.linspace(0, line_points.shape[0] - 1, ouster_points_per_line)).astype(int)
+                        downsampled_points.append(line_points[sampled_indices])
+                    else:
+                        # 如果点数不足，可以选择跳过或直接使用现有点
+                        # 这里选择直接使用现有点
+                        downsampled_points.append(line_points)
+                downsampled_points = np.vstack(downsampled_points)
+                lidar = downsampled_points
+                print("robosense to ouster downsample")
+            else:
+                raise NotImplementedError
+                
         # filter nan
         lidar = lidar[~np.isnan(lidar).any(axis=1)]
         lidar = lidar[:, :4]
