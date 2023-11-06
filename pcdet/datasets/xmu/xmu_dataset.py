@@ -287,7 +287,7 @@ class XMechanismUnmanned(DatasetTemplate):
                         downsampled_points.append(line_points)
                 downsampled_points = np.vstack(downsampled_points)
                 lidar = downsampled_points
-                print("robosense to ouster downsample")
+                
             else:
                 raise NotImplementedError
                 
