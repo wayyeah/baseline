@@ -9,37 +9,17 @@ import torch
 
 # import open3d as o3d
 from pypcd import pypcd
-from scipy import stats
 
 from ...ops.roiaware_pool3d import roiaware_pool3d_utils
 from ...utils import box_utils, common_utils
 from ..dataset import DatasetTemplate
-def get_line_indices(xyz, vertical_fov, vertical_resolution):
-    # Number of lines
-    num_lines = int(vertical_fov / vertical_resolution)
-    
-    # Calculate the elevation angle for each point
-    r = np.sqrt(xyz[:, 0]**2 + xyz[:, 1]**2)
-    elevation_angles = np.arctan2(xyz[:, 2], r)
-    
-    # Convert elevation angles to degrees
-    elevation_angles_deg = np.degrees(elevation_angles)
-    
-    # Calculate the range of angles covered by the lines
-    min_angle = -vertical_fov / 2
-    max_angle = vertical_fov / 2
-    
-    # Normalize elevation angles to a 0 to num_lines range
-    normalized_angles = (elevation_angles_deg - min_angle) / (max_angle - min_angle) * num_lines
-    
-    # Assign points to line indices
-    line_indices = np.floor(normalized_angles).astype(int)
-    
-    # Ensure line indices are within the valid range
-    line_indices[line_indices < 0] = 0
-    line_indices[line_indices >= num_lines] = num_lines - 1
-    
-    return line_indices
+
+
+"""
+aiming at UDA now, supporting of fusion detection coming soon
+leave a sensor list for it 
+make infos for all sensors in a single pkl for it
+"""
 def crop_sector(points, radius_range, angle_range):
     # 计算极坐标系下的半径和角度
     r = np.sqrt(points[:, 0] ** 2 + points[:, 1] ** 2)
@@ -53,13 +33,6 @@ def crop_sector(points, radius_range, angle_range):
     cropped_points = points[mask]
     
     return cropped_points
-
-"""
-aiming at UDA now, supporting of fusion detection coming soon
-leave a sensor list for it 
-make infos for all sensors in a single pkl for it
-"""
-
 
 # 默认任务是针对单个传感器的检测任务，只是在生成和获取pkl的时候忽略这个问题而已
 class XMechanismUnmanned(DatasetTemplate):
@@ -87,8 +60,8 @@ class XMechanismUnmanned(DatasetTemplate):
 
         # training or testing
         self.split = self.dataset_cfg.DATA_SPLIT[self.mode]
-        self.split_file = os.path.join(self.root_path, 'ImageSets', self.split + '.txt')
-        
+        self.split_file = os.path.join(self.root_path, 'ImageSets', self.split + '_top_2_percent.txt')
+        #self.split_file = os.path.join(self.root_path, 'ImageSets', self.split + '_last_90_percent.txt')
         self.sample_seq_list = [x.strip() for x in open(self.split_file).readlines()]
         self.sample_idx_list = [{'seq': seq, 'frame_id': frame_id} for seq in self.sample_seq_list for frame_id in range(200)]
 
@@ -108,12 +81,13 @@ class XMechanismUnmanned(DatasetTemplate):
         xmu_infos = []
         for info_path in self.dataset_cfg.INFO_PATH[mode]:
             info_path = self.root_path / info_path
+            print(info_path)
             if info_path is None or not Path(info_path).exists():
                 self.logger.info('Info file %s not exists.'%info_path)
                 continue
             with open(info_path, 'rb') as f:
                 xmu_infos.extend(pickle.load(f))
-        
+       
         self.xmu_infos.extend(xmu_infos)
 
         self.logger.info('Total sequences of sensor %s in mode %s is %d'%(self.sensor, self.mode, len(xmu_infos)))
@@ -184,16 +158,18 @@ class XMechanismUnmanned(DatasetTemplate):
             assert item['act'] , 'attribute act lost in label file %s' % label_file
             assert item['categoryId'] , 'attribute categoryId lost in label file %s' % label_file
             assert item['trackId'] , 'attribute trackId lost in label file %s' % label_file
+
         
+
         # mapping 
         assert 'TRAINING_CATEGORIES_MAPPING' in self.dataset_cfg, 'TRAINING_CATEGORIES_MAPPING not in dataset_cfg'
         if self.dataset_cfg.TRAINING_CATEGORIES_MAPPING:
-            # print(classes, classes.shape) 
+            # print(classes, classes.shape)
             for i in range(len(classes)):
                 if classes[i] in self.dataset_cfg.TRAINING_CATEGORIES_MAPPING:
                     classes[i] = self.dataset_cfg.TRAINING_CATEGORIES_MAPPING[classes[i]]
                     # 被截断了，Pedestria，要非常注意改变numpy的str类型，长度不可变
-                    assert classes[i] in ['Car', 'Truck', 'Pedestrian', 'Cyclist'], 'class %s not in [Car, Truck, Pedestrian, Cyclist]'%classes[i]
+                    # assert classes[i] in ['Car', 'Truck', 'Pedestrian', 'Cyclist'], 'class %s not in [Car, Truck, Pedestrian, Cyclist]'%classes[i]
                 else:
                     classes[i] = 'DontCare'
         classes = np.array(classes)
@@ -211,28 +187,24 @@ class XMechanismUnmanned(DatasetTemplate):
         
         lidar_file_list = os.listdir(os.path.join(self.root_path, 'seq'+seq, sensor))
         lidar_file_list.sort() #一定要sort，不然顺序不对
-
         lidar_file = os.path.join(self.root_path, 'seq'+seq, sensor, lidar_file_list[int(frame)])
-
         assert Path(lidar_file).exists(), "lidar file %s not exists."%lidar_file
-        assert num_features==4, 'only support xyzi currently'
+        # read pcd
         lidar = pypcd.PointCloud.from_path(lidar_file)
+        # 转成numpy array
+        # print(lidar.pc_data.dtype)
+        # print(lidar.pc_data.shape, type(lidar.pc_data))
+
+        assert num_features==4, 'only support xyzi currently'
+        
         pc_x = lidar.pc_data['x']
         pc_y = lidar.pc_data['y']
         pc_z = lidar.pc_data['z']
         pc_i = lidar.pc_data['intensity']
-        pc_ring = lidar.pc_data['ring']
-        # for intensity
-        if self.dataset_cfg.get('BOX_COX_NORM_INTENSITY', False):
-            # box_cox_lambda = {'ouster':0.529603806963828, 'hesai':0.5931315699272153, 'robosense':0.4900647247193385}
-            box_cox_lambda = {'ouster': 0.5194996882001862, 'hesai': 0.592819354971455, 'robosense': 0.5432802611595038}
-            pc_i = np.log(pc_i + 1)
-            pc_i = stats.boxcox(pc_i+1e-6, box_cox_lambda[sensor])
-            # normalize to [0, 1]
-            pc_i = ((pc_i - np.mean(pc_i))/ np.std(pc_i)) * (np.max(pc_i) - np.min(pc_i)) + np.min(pc_i)
-
-        lidar = np.stack([pc_x, pc_y, pc_z, pc_i, pc_ring], axis=1)
-
+        # print(pc_x.shape, pc_y.shape, pc_z.shape, pc_i.shape)
+        # exit()
+        lidar = np.stack([pc_x, pc_y, pc_z, pc_i], axis=1)
+        # print(lidar.shape)
         to_ego = True
         if to_ego:
             # transform points to ego vehicle coord with calib using matrix multiplication
@@ -241,89 +213,15 @@ class XMechanismUnmanned(DatasetTemplate):
             lidar_new1 = np.dot(calib, lidar_new.T).T # 这样才是对的！！！
             lidar = np.concatenate((lidar_new1[:, :3], lidar[:, 3:]), axis=1)
         lidar = lidar[lidar[:, 0]>=0]
-
-        # for density
-        if sensor == 'ouster' or sensor == 'robosense':
-            if self.dataset_cfg.get('DISTANCE_BEAM_DOWNSAMPLE', False):
-                lines_kept = [18,21,24,27,30,32,35,38, \
-                              41,44,47,49,52,55,58,61, \
-                              64,66,69,72,75,78,80,83, \
-                              86,89,92,95,97,100,103,106]
-                mask_line= np.isin(lidar[:, 4], lines_kept)
-                distance = np.sqrt(np.sum(lidar[:, :2]**2, axis=1))
-                # generate sampling probability
-                prob = np.array([1 if mask_line[i] else 0 for i in range(mask_line.shape[0])])
-                # alter arctan function for sampling probability
-                distance_prob = (1 - np.exp(- 1/35 * distance))
-                prob = prob + distance_prob
-                downsampe_prob = 0.5 # kept the original or not
-                if np.random.rand() < downsampe_prob:
-                    mask = np.random.rand(prob.shape[0]) < prob
-                    lidar = lidar[mask]
-
-            elif self.dataset_cfg.get('BIN_BEAM_DOWNSAMPLE',False):
-                downsampe_prob = 0.5
-                if np.random.rand() < downsampe_prob:
-                    lidar = self.bin_beam_downsample(lidar)
-        if sensor=="robosense":
-            if self.dataset_cfg.get('ROBOSENSE_TO_OUTSTER_DOWNSAMPLE', False):
-                ouster_points_per_line=(1024//3)
-                vertical_fov = 25.0  # 垂直视场角度
-                vertical_resolution = 0.2  # 垂直角分辨率
-                robosense_lines = int(vertical_fov / vertical_resolution)  # 线束数量
-                vertical_fov = 25
-                vertical_resolution = 0.2 
-                line_indices = get_line_indices(lidar[:,:3], vertical_fov, vertical_resolution)
-                downsampled_points = []
-                for i in range(125):
-                    mask=(line_indices==i)
-                    line_points = lidar[mask]
-                    if line_points.shape[0] >= ouster_points_per_line:
-                        sampled_indices = np.round(np.linspace(0, line_points.shape[0] - 1, ouster_points_per_line)).astype(int)
-                        downsampled_points.append(line_points[sampled_indices])
-                    else:
-                        # 如果点数不足，可以选择跳过或直接使用现有点
-                        # 这里选择直接使用现有点
-                        downsampled_points.append(line_points)
-                downsampled_points = np.vstack(downsampled_points)
-                lidar = downsampled_points
-                
-           
-                
+        
         # filter nan
         lidar = lidar[~np.isnan(lidar).any(axis=1)]
-        lidar = lidar[:, :4]
         
-         #裁切点云
         radius_range = [0, 150]  # 半径范围
         angle_range = [-np.pi / 3, np.pi / 3]  # 60度到负60度，转换为弧度
         cropped_points = crop_sector(lidar, radius_range, angle_range)
         lidar=cropped_points
         return lidar
-
-    def downsample_ouster_to_hesai(self, points, rings):
-        ouster_fov_range = (-22.5, 22.5)
-        hesai_fov_range = (-16, 15)
-
-        ouster_angles = np.linspace(ouster_fov_range[0], ouster_fov_range[1], 128)
-        hesai_angles = np.linspace(hesai_fov_range[0], hesai_fov_range[1], 32)
-
-        collected_bin_points = [] 
-
-        for hesai_angle in hesai_angles:
-            # Find the closest ouster angle
-            closest_ouster_angle_idx = np.argmin(np.abs(ouster_angles - hesai_angle))
-
-            # Use this index to mask the points and rings
-            mask = rings == closest_ouster_angle_idx
-            bin_points = points[mask]
-
-            if len(bin_points) == 0:
-                continue
-            
-            collected_bin_points.append(bin_points)
-
-        return np.vstack(collected_bin_points)
 
     #√ 这里还需要看看问题imu
     def get_calib(self, idx, sensor):
@@ -339,6 +237,17 @@ class XMechanismUnmanned(DatasetTemplate):
         return calib
 
     def get_pose(self, idx, sensor=None):
+        # assert seq >=0 and seq<=49, "seq should be in [0, 199]"
+        # if sensor in ['robosense', 'ouster', 'hesai', 'gpal']:
+        #     pose_file = os.path.join(self.root_path, seq , 'pose', '%s.txt'%frame.zfill(4))
+        # elif sensor in ['left', 'front', 'right']:
+        #     pose_file = os.path.join(self.root_path, seq , 'pose', '%s.txt'%frame.zfill(4))
+        # else:
+        #     raise NotImplementedError
+        # assert pose_file.exists(), "pose file %s not exists."%pose_file
+        # # read pose
+        # pose = np.loadtxt(pose_file, dtype=np.float32)
+        # return pose
 
         # TODO: pose
         # output with time
@@ -355,9 +264,9 @@ class XMechanismUnmanned(DatasetTemplate):
             root_path=self.root_path, logger=self.logger
         )
         self.split = split
-        split_dir = os.path.join(self.root_path, 'ImageSets', self.split+'.txt')
+        split_dir = os.path.join(self.root_path, 'ImageSets', self.split+'_top_2_percent.txt')
+        #split_dir = os.path.join(self.root_path, 'ImageSets', self.split+'_last_90_percent.txt')
         self.sample_seq_list = [x.strip() for x in open(split_dir).readlines()]
-
     def __len__(self):
         if self._merge_all_iters_to_one_epoch:
             return len(self.sample_idx_list) * self.total_epochs
@@ -372,22 +281,7 @@ class XMechanismUnmanned(DatasetTemplate):
         idx = info['idx']
         # get lidar
         points = self.get_lidar(idx, sensor=self.sensor)
-
-        # # get label
-        # boxes_7DoF, boxes_9DoF, classes, track_ids, confidences, occulusions, acts, points_num = self.get_label(idx)
-
-        # num_gt = boxes_7DoF.shape[0]
-        # if num_gt> 0:
-        #     point_indices = roiaware_pool3d_utils.points_in_boxes_cpu(
-        #         torch.from_numpy(points[:, 0:3]), torch.from_numpy(boxes_7DoF)
-        #     ).numpy() # (num_gt, num_points)
-        #     existance = np.array([False for i in range(num_gt)])
-        #     for i in range(num_gt):
-        #         if points[point_indices[i, :] > 0].shape[0] > 0:
-        #             existance[i] = True
-        #     boxes_7DoF = boxes_7DoF[existance]
-        #     classes = classes[existance]
-
+        
         assert 'annos' in info, 'no annos in info'
         if 'annos' in info:
             annos = info['annos']
@@ -405,8 +299,8 @@ class XMechanismUnmanned(DatasetTemplate):
                         existance[i] = True
                 boxes_7DoF = boxes_7DoF[existance]
                 classes = classes[existance]
-        
-    
+
+
         input_dict = {
             # 'db_flag': "xmu_%s" % self.sensor,
             'frame_id': self.sample_idx_list[index],
@@ -416,11 +310,18 @@ class XMechanismUnmanned(DatasetTemplate):
             'gt_names': classes,
         }
 
-        data_dict = self.prepare_data(input_dict)
+        # filter empty boxes
 
-        # store data_dict for debug
-        with open ('data_dict.pkl', 'wb') as f:
-            pickle.dump(data_dict, f)
+        # input_dict['gt_boxes_ori'] = boxes_7DoF
+
+        data_dict = self.prepare_data(input_dict)
+        
+        # # dump to pickle for debug
+        # with open('input_dict.pkl', 'wb') as f:
+        #     pickle.dump(input_dict, f)
+        # with open('data_dict.pkl', 'wb') as f:
+        #     pickle.dump(data_dict, f)
+        # exit()
 
 
         return data_dict
@@ -523,7 +424,7 @@ class XMechanismUnmanned(DatasetTemplate):
 
 
     # 用来生成写入到pkl文件的数据集信息的
-    def get_infos(self, class_names, num_workers=4, has_lable=True, sample_seq_list=None, num_features=4):
+    def get_infos(self, class_names, num_workers=4, has_lable=True, sample_seq_list=None, num_features=4, sensor=None):
         import concurrent.futures as futures
 
         """
@@ -548,7 +449,7 @@ class XMechanismUnmanned(DatasetTemplate):
         - pose
         - label_path
         """
-        def process_single_sequence(seq_idx):
+        def process_single_sequence(seq_idx, sensor_cur=None):
             # seq_idx = str(seq_idx).zfill(2)
             print("processing sequence {} ...".format(seq_idx))
 
@@ -566,6 +467,7 @@ class XMechanismUnmanned(DatasetTemplate):
                 image_path = os.path.join(self.root_path, 'seq'+seq_idx, 'camera_'+camera)
                 image_paths[camera] = [os.path.join(self.root_path, 'seq'+seq_idx, 'camera_'+camera, path) for path in os.listdir(os.path.join(self.root_path, 'seq'+seq_idx, 'camera_'+camera))]
                 assert len(image_paths[camera]) == 200, "sequence {} has {} {} frames, rather than 200!".format(seq_idx, len(image_paths[camera]), camera)
+
 
             calibs = {}
             idx = {'seq': seq_idx , 'frame': 0}
@@ -607,7 +509,7 @@ class XMechanismUnmanned(DatasetTemplate):
 
                 info['label_path'] = os.path.join(self.root_path, 'label_ego', 'seq'+seq_idx, str(i).zfill(4)+'.json')
                 assert os.path.exists(info['label_path']), "the label file {} does not exist!".format(info['label_path'])
-            
+                
                 if has_lable:
                     annotations = {}
                     boxes_7DoF, boxes_9DoF, classes, track_ids, confidences, occulusions, acts, points_num = self.get_label(idx=idx)
@@ -618,42 +520,61 @@ class XMechanismUnmanned(DatasetTemplate):
                 seq_infos.append(copy.deepcopy(info)) # 复制出了问题？？
                 # print(info)
             return seq_infos
+      
         
         sample_seq_list = sample_seq_list if sample_seq_list is not None else self.sample_seq_list
         print('sample_seq_list: ', sample_seq_list)
+       
+        # with futures.ThreadPoolExecutor(num_workers) as executor:
+        #     infos = executor.map(process_single_sequence, sample_seq_list)
+        #     # print('infos: ', infos)
 
+        # # print('infos type:', type(infos), len(infos))
+        # infos_l = list(infos)
+        # print('infos type:', type(infos_l), len(infos_l))
+        # # print('infos_total: ', infos)
+        # all_infos = []
+        # for info in infos_l:
+        #     # print('info: ', info)
+        #     all_infos += info
+        # print(len(all_infos), type(all_infos))
+        # return all_infos
         all_infos = []      
+        # 是不是变量复制出了问题？？？
+        # print(sample_seq_list)
+        # print(self.sample_seq_list)
+        # exit()
 
         for seq_idx in sample_seq_list:
-            single_seq_infos = process_single_sequence(seq_idx)
+            single_seq_infos = process_single_sequence(seq_idx, sensor_cur=sensor)
             all_infos += copy.deepcopy(single_seq_infos)
         print('len all_infos: ', len(all_infos))
         # print('all_infos: ', all_infos)
         return all_infos
 
     # 对于每一个传感器，有一个gt_database，一起生成了
-    def create_groundtruth_database(self, info_path, used_classes=None, split='train', sensor=None):
+    def create_groundtruth_database(self, info_path, used_classes=None, split='train'):
         print(used_classes)
         dis_thresh=70.4
         print("distance_thresh: ",dis_thresh)
-        import time
-        time.sleep(5)
         import torch
         assert split in ['train', 'val', 'test']
-        if not sensor:
-            sensors = ['robosense', 'ouster', 'hesai']
+        # sensors = ['robosense', 'ouster', 'hesai', 'gpal']
+        # sensors = ['gpal']
+        sensors = ['robosense', 'ouster', 'hesai']
         with open(info_path, 'rb') as f:
             infos = pickle.load(f)
         
         print('len info when create gt_database: ', len(infos))
         # print('info when create gt_database: ', infos)
         for sensor in sensors:
-            database_save_path = Path(self.root_path) / ('gt_database_%s_%s' % (sensor,dis_thresh) if split == 'train' else 'gt_database_%s_%s_%s' % (self.sensor, split,dis_thresh))
-            db_info_save_path = Path(self.root_path) / ('gt_database_info_%s_%s.pkl' % (sensor,dis_thresh) if split == 'train' else 'gt_database_info_%s_%s_%s.pkl' % (self.sensor, split,dis_thresh))
+            database_save_path = Path(self.root_path) / ('top_2_percent_gt_database_%s' % sensor if split == 'train' else 'top_2_percent_gt_database_%s_%s' % (self.sensor, split))
+            db_info_save_path = Path(self.root_path) / ('top_2_percent_gt_database_info_%s.pkl' % sensor if split == 'train' else 'top_2_percent_gt_database_info_%s_%s.pkl' % (self.sensor, split))
 
             database_save_path.mkdir(parents=True, exist_ok=True)
             all_db_infos = {}
             print('generation gt_database for sensor: %s' % sensor)
+            
             for i in range(len(infos)):
                 print('%s gt_database sample: %d/%d' % (sensor, i+1, len(infos)))
                 info = infos[i]
@@ -662,40 +583,40 @@ class XMechanismUnmanned(DatasetTemplate):
                 annos = info['annos']
                 gt_boxes_7DoF = annos['boxes_7DoF']
                 gt_names = annos['name']
-
                 num_gt = gt_boxes_7DoF.shape[0]
                 point_indices = roiaware_pool3d_utils.points_in_boxes_cpu(
                     torch.from_numpy(points[:, 0:3]), torch.from_numpy(gt_boxes_7DoF)
                 ).numpy() # (num_gt, num_points)
 
-                for i in range(num_gt):
-                    file_name = '%s_%s_%s_%d.bin' % (idx['seq'], idx['frame'], gt_names[i], i)
+                for j in range(num_gt):
+                    file_name = '%s_%s_%s_%d.bin' % (idx['seq'], idx['frame'], gt_names[j], j)
                     file_path = database_save_path / file_name
-                    gt_points = points[point_indices[i, :] > 0]
+                    gt_points = points[point_indices[j, :] > 0]
                     if gt_points.shape[0] == 0: # 滤掉没有点的gt_box
                         continue
-                    dis=np.sqrt(np.sum(gt_boxes_7DoF[i][:3]**2))
+        
+
+                    dis=np.sqrt(np.sum(gt_boxes_7DoF[j][:3]**2))
                     #print(dis)
                     if(dis>dis_thresh):#过滤掉距离过远的点
                         continue
-                    gt_points[:, :3] -= gt_boxes_7DoF[i, :3]
-
+                    gt_points[:, :3] -= gt_boxes_7DoF[j, :3]
                     with open(file_path, 'wb') as f:
                         gt_points.tofile(f)
-                    
-                    if (used_classes is None) or (gt_names[i] in used_classes):
+                    if (used_classes is None) or (gt_names[j] in used_classes):
                         db_path = str(file_path.relative_to(self.root_path))
-                        db_info = {'name': gt_names[i], 'path': db_path, 'gt_idx': i,
-                                   'box3d_lidar': gt_boxes_7DoF[i], 'num_points_in_gt': gt_points.shape[0]}
-                        if gt_names[i] in all_db_infos.keys():
-                            all_db_infos[gt_names[i]].append(db_info)
+                        db_info = {'name': gt_names[j], 'path': db_path, 'gt_idx': j,
+                                   'box3d_lidar': gt_boxes_7DoF[j], 'num_points_in_gt': gt_points.shape[0]}
+                        if gt_names[j] in all_db_infos.keys():
+                            all_db_infos[gt_names[j]].append(db_info)
                         else:
-                            all_db_infos[gt_names[i]] = [db_info]
+                            all_db_infos[gt_names[j]] = [db_info]
 
             for k, v in all_db_infos.items():
                 print('sensor--%s database of %s : %d' % (sensor, k, len(v)))
             with open(db_info_save_path, 'wb') as f:
                 pickle.dump(all_db_infos, f)
+                
 
     @staticmethod
     def create_lable_file_with_name_and_box(class_names, gt_names, gt_boxes, save_label_path):
@@ -711,93 +632,6 @@ class XMechanismUnmanned(DatasetTemplate):
                 )
                 f.write(line)
 
-    ##### add for distance bin based downsampling
-    def partition(self, points, num=6, max_dis=150, rate=0.5):
-        """
-        partition the points into several bins.
-        """
-
-        points = points[points[:, 0] >= 0]
-
-        points_list = []
-        inter = max_dis / num
-
-        all_points_num = points.shape[0]
-
-        points_num_acc = 0
-
-        position = num - 1
-
-        distant_points_num_acc = 0
-
-        for i in range(num):
-            i = num - i - 1
-            if i == num - 1:
-                # min_mask = points[:, 0] >= inter * i # 去掉距离外的点
-                # use distance rather than x
-                min_mask = np.sqrt(np.sum(points[:, :2]**2, axis=1)) >= inter * i
-                this_points = points[min_mask]
-
-                points_num_acc += this_points.shape[0]
-
-                sampled_sum = points_num_acc + i * this_points.shape[0]
-
-                if sampled_sum / all_points_num < rate:
-                    position = i
-                    distant_points_num_acc = points_num_acc
-
-                points_list.append(this_points)
-            else:
-                min_mask = points[:, 0] >= inter * i
-                max_mask = points[:, 0] < inter * (i + 1)
-                mask = min_mask * max_mask
-                this_points = points[mask]
-
-                points_num_acc += this_points.shape[0]
-
-                sampled_sum = points_num_acc + i * this_points.shape[0]
-
-                if sampled_sum / all_points_num < rate:
-                    position = i
-                    distant_points_num_acc = points_num_acc
-
-                points_list.append(this_points)
-
-        if position <= 0:
-            position = 0
-
-        return points_list, position, distant_points_num_acc
-
-    def bin_beam_downsample(self, points, bin_num=6, rate=0.75):
-        """
-        bin-based sampling.
-        """
-        retain_rate = 1 - rate
-        parts, pos, distant_points_num_acc = self.partition(points, num=bin_num, rate=retain_rate)
-
-        pc_ring = parts[0][:, 4]
-        # downsample points within 25m
-        lines_kept = [18,21,24,27,30,32,35,38, \
-                      41,44,47,49,52,55,58,61, \
-                      64,66,69,72,75,78,80,83, \
-                      86,89,92,95,97,100,103,106]
-        # print(lidar.shape)
-        mask = np.isin(pc_ring, lines_kept)
-        parts[0] = parts[0][mask]
-
-        # output_pts_num = int(points.shape[0] * retain_rate)
-        output_pts_num = parts[0].shape[0]
-
-        pts_per_bin_num = int((output_pts_num-distant_points_num_acc)/(pos+0.0001))
-
-        for i in range(1, len(parts) - pos, len(parts)):
-
-            if parts[i].shape[0] > pts_per_bin_num:
-                rands = np.random.permutation(parts[i].shape[0])
-                parts[i] = parts[i][rands[:pts_per_bin_num]]
-
-        return np.concatenate(parts)
-
 # block for creating dataset infos
 def create_xmu_infos(dataset_cfg, class_names, data_path, save_path, workers=4):
     dataset = XMechanismUnmanned(
@@ -805,37 +639,50 @@ def create_xmu_infos(dataset_cfg, class_names, data_path, save_path, workers=4):
         training =True, logger=common_utils.create_logger()
     ) # 这里设置training为False会不会影响到后面的数据读取？？
     train_split, val_split, test_split = 'train', 'val', 'test'
-
-    train_filename = os.path.join(save_path, 'xmu_infos_%s.pkl'%train_split)
-    val_filename = os.path.join(save_path,   'xmu_infos_%s.pkl'%val_split)
-    test_filename = os.path.join(save_path,  'xmu_infos_%s.pkl'%test_split)
-
-    print ('---------------Start to create xmu infos---------------')
-
-    dataset.set_split(train_split)
-    xmu_infos_train = dataset.get_infos(class_names, num_workers=workers, has_lable=True, sample_seq_list=None, num_features=4)
     
-    with open(train_filename, 'wb') as f:
-        pickle.dump(xmu_infos_train, f)
-    print ('xmu %s samples are saved to %s'%(train_split, train_filename))
+    sensors = ['robosense', 'ouster', 'hesai']
 
-    dataset.set_split(val_split)
-    xmu_infos_val = dataset.get_infos(class_names, num_workers=workers, has_lable=True, sample_seq_list=None, num_features=4)
-    with open(val_filename, 'wb') as f:
-        pickle.dump(xmu_infos_val, f)
-    print ('xmu %s samples are saved to %s'%(val_split, val_filename))
+    for sensor in sensors:
+        #train_filename = os.path.join(save_path, 'last_90_percent_xmu_%s_infos_%s.pkl'%(sensor,train_split))
+        train_filename = os.path.join(save_path, 'top_2_percent_xmu_infos_%s.pkl'%train_split)
+    # val_filename = os.path.join(save_path,   'top_10_percent_xmu_infos_%s.pkl'%val_split)
+    # test_filename = os.path.join(save_path,  'top_10_percent_xmu_infos_%s.pkl'%test_split)
 
-    dataset.set_split(test_split)
-    xmu_infos_test = dataset.get_infos(class_names, num_workers=workers, has_lable=True, sample_seq_list=None, num_features=4)
-    # print('xmu_info_test: ', xmu_infos_test)
-    with open(test_filename, 'wb') as f:
-        pickle.dump(xmu_infos_test, f)
-    print ('xmu %s samples are saved to %s'%(test_split, test_filename))
+        print ('---------------Start to create xmu infos %s---------------'%sensor)
+
+        dataset.set_split(train_split)
+        #xmu_infos_train = dataset.get_infos(class_names, num_workers=workers, has_lable=False, sample_seq_list=None, num_features=4, sensor=sensor)
+
+    
+        xmu_infos_train = dataset.get_infos(class_names, num_workers=workers, has_lable=True, sample_seq_list=None, num_features=4)
+    # # print('len xmu_infos_train: ', len(xmu_infos_train))
+    # # print('sample xmu_infos_train: ', xmu_infos_train[0])
+    # # print('sample xmu_infos_train: ', xmu_infos_train[1])
+    # # print('sample xmu_infos_train: ', xmu_infos_train[390])
+    # # print('sample xmu_infos_train: ', xmu_infos_train[391])
+    
+        with open(train_filename, 'wb') as f:
+            pickle.dump(xmu_infos_train, f)
+        print ('xmu %s samples are saved to %s'%(train_split, train_filename))
+
+    # # dataset.set_split(val_split)
+    # # xmu_infos_val = dataset.get_infos(class_names, num_workers=workers, has_lable=True, sample_seq_list=None, num_features=4)
+    # # with open(val_filename, 'wb') as f:
+    # #     pickle.dump(xmu_infos_val, f)
+    # # print ('xmu %s samples are saved to %s'%(val_split, val_filename))
+
+    # # dataset.set_split(test_split)
+    # # xmu_infos_test = dataset.get_infos(class_names, num_workers=workers, has_lable=True, sample_seq_list=None, num_features=4)
+    # # # print('xmu_info_test: ', xmu_infos_test)
+    # # with open(test_filename, 'wb') as f:
+    # #     pickle.dump(xmu_infos_test, f)
+    # # print ('xmu %s samples are saved to %s'%(test_split, test_filename))
 
     print ('Start creating xmu groundtruth database for %s split'%train_split)
     dataset.set_split(train_split)
     dataset.create_groundtruth_database(train_filename, used_classes=class_names, split=train_split)
     print ('Info generation done for XMechanismUnmanned dataset!')
+
 
 
 if __name__ == "__main__":
@@ -850,7 +697,7 @@ if __name__ == "__main__":
         import yaml
         from easydict import EasyDict
         from pathlib import Path
-
+       
         dataset_cfg = EasyDict(yaml.safe_load(open(args.cfg_file)))
         assert dataset_cfg.SENSOR == 'NotSelected', 'all the sensor should be generate'
         ROOT_DIR = (Path(__file__).resolve().parent / '../../../').resolve()
@@ -858,11 +705,9 @@ if __name__ == "__main__":
         create_xmu_infos(
             dataset_cfg=dataset_cfg,
             class_names=['Car', 'Truck', 'Pedestrian', 'Cyclist'],
-            # sensors=sensors,
+            
             data_path=ROOT_DIR / 'data' / 'xmu',
             save_path=ROOT_DIR / 'data' / 'xmu', 
         )
-    else:
-        raise NotImplementedError
 
 # test function
