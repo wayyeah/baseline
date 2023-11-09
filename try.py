@@ -19,38 +19,62 @@ def downsample_ouster_to_hesai():
     lines_kept = np.array([i for i in range(128) if ouster_angles_keep[i] == True])
     return ouster_angles_keep, lines_kept
 
+def crop_sector(points, radius_range, angle_range):
+    # 计算极坐标系下的半径和角度
+    r = np.sqrt(points[:, 0] ** 2 + points[:, 1] ** 2)
+    theta = np.arctan2(points[:, 1], points[:, 0])
+    
+    # 将角度转换到 [-π, π) 范围
+    theta = np.mod(theta + np.pi, 2 * np.pi) - np.pi
+    
+    # 应用裁剪条件
+    mask = (r >= radius_range[0]) & (r <= radius_range[1]) & (theta >= angle_range[0]) & (theta <= angle_range[1])
+    cropped_points = points[mask]
+    
+    return cropped_points
+
 
 
 def get_lidar(idx, sensor, num_features=4):
     seq = idx['seq']
     frame = idx['frame']
-    assert sensor , 'sensor is not specified'
-    root_path = '/home/xmu/projects/xmuda/OpenPCDet/data/xmu'
-
+    root_path = "data/xmu"
+    
     lidar_file_list = os.listdir(os.path.join(root_path, 'seq'+seq, sensor))
     lidar_file_list.sort() #一定要sort，不然顺序不对
     lidar_file = os.path.join(root_path, 'seq'+seq, sensor, lidar_file_list[int(frame)])
     assert Path(lidar_file).exists(), "lidar file %s not exists."%lidar_file
-    # read pcd
-    lidar = pypcd.PointCloud.from_path(lidar_file)
     assert num_features==4, 'only support xyzi currently'
-    
+    lidar = pypcd.PointCloud.from_path(lidar_file)
     pc_x = lidar.pc_data['x']
     pc_y = lidar.pc_data['y']
     pc_z = lidar.pc_data['z']
     pc_i = lidar.pc_data['intensity']
-    # print(pc_x.shape, pc_y.shape, pc_z.shape, pc_i.shape)
-    # exit()
-    
-    # pc_i = np.log(pc_i + 1e-6)
 
     lidar = np.stack([pc_x, pc_y, pc_z, pc_i], axis=1)
-    # print('sensor: ', sensor, ' shape: ', lidar.shape)
-    
+    to_ego = True
+    if to_ego:
+        # transform points to ego vehicle coord with calib using matrix multiplication
+        calib_file = os.path.join(root_path, 'calib_to_ego', 'transformation_matrix_%s_ego.txt'%sensor)
+        assert Path(calib_file).exists(), "calib file %s not exists."%calib_file
+        # read calib
+        calib = np.loadtxt(calib_file, dtype=np.float32)
+        lidar_new = np.concatenate((lidar[:, :3], np.ones((lidar.shape[0], 1))), axis=1)
+        lidar_new1 = np.dot(calib, lidar_new.T).T # 这样才是对的！！！
+        lidar = np.concatenate((lidar_new1[:, :3], lidar[:, 3:]), axis=1)
+    lidar = lidar[lidar[:, 0]>0]   
+       
+            
+    # filter nan
     lidar = lidar[~np.isnan(lidar).any(axis=1)]
+    lidar = lidar[:, :4]
     
+     #裁切点云
+    radius_range = [0, 150]  # 半径范围
+    angle_range = [-np.pi / 3, np.pi / 3]  # 60度到负60度，转换为弧度
+    cropped_points = crop_sector(lidar, radius_range, angle_range)
+    lidar=cropped_points
     return lidar
-
 
 from matplotlib import pyplot as plt
 import math
@@ -363,6 +387,86 @@ def rename_seq_lab():
         print("done renaming %s"%path)
 
 
+def density_statistic():
+    # sensors = ['ouster', 'hesai', 'robosense', 'gpal']
+    sensors = ['ouster', 'hesai', 'robosense']
+    # sensors = ['ouster']
+    # count the point of every frame from each sensor
+    points_sensor = {}
+    # more_points_seq = []
+    for sensor in sensors:
+        print('sensor: ', sensor)
+        cnt_sensor = []
+        points_sensor[sensor] = []
+        for seq in range(1,51):
+            for frame in range(200):
+                idx = {'seq':str(seq).zfill(2), 'frame':str(frame).zfill(3)}
+                lidar = get_lidar(idx, sensor)
+                cnt_sensor.append(lidar.shape[0])
+                # if lidar.shape[0] > 200000:
+                    # more_points_seq.append(seq)
+                points_sensor[sensor].append(lidar)
+        cnt_sensor = np.array(cnt_sensor)
+        # more_points_seq remove same seq
+        # more_points_seq = list(set(more_points_seq))
+        # print('more_points_seq: ', more_points_seq)
+
+        # save lidar to npy
+        points_sensor[sensor] = np.array(points_sensor[sensor])
+        # concatenate all the points
+
+        save_path = os.path.join('points', sensor)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        np.save(os.path.join(save_path, 'points_spare.npy'), points_sensor[sensor])
+
+        points_sensor[sensor] = np.concatenate(points_sensor[sensor])
+
+        np.save(os.path.join(save_path, 'points.npy'), points_sensor[sensor])
+
+        # draw the histogram
+        plt.hist(cnt_sensor, bins=125, cumulative=False, label=sensor, density=True)
+        # save the figure for each sensor
+        plt.legend()
+        plt.savefig('density_statistic_{}.png'.format(sensor))
+        plt.clf()
+
+    # draw distance statistic
+    for sensor in sensors:
+        points_sensor[sensor] = np.load(os.path.join('points', sensor, 'points.npy'), allow_pickle=True)
+        print(sensor, points_sensor[sensor].shape)
+        # points_sensor[sensor] = np.reshape(points_sensor[sensor], (-1,3))
+        # print(sensor, points_sensor[sensor].shape)
+        # draw the histogram
+        plt.hist(points_sensor[sensor][:,0], bins=125, cumulative=False, label=sensor, density=True, alpha=0.5)
+    plt.legend()
+    plt.savefig('density_statistic_distance_all.png')
+    plt.clf()
+
+    # for all the sensors
+    for sensor in sensors:
+        points_sensor[sensor] = np.load(os.path.join('points', sensor, 'points_spare.npy'), allow_pickle=True)
+        # draw the histogram of number points per frame
+        cnt_sensor = []
+        for i in range(points_sensor[sensor].shape[0]):
+            cnt_sensor.append(points_sensor[sensor][i].shape[0])
+        cnt_sensor = np.array(cnt_sensor)
+        plt.hist(cnt_sensor, bins=125, cumulative=False, label=sensor, density=True, alpha=0.5)
+    plt.legend()
+    plt.savefig('density_statistic_frame_all.png')
+    plt.clf()
+
+
+def density_stat():
+    sensors = ['ouster']
+    for sensor in sensors:
+        points_sensor = np.load(os.path.join('points', sensor, 'points.npy'), allow_pickle=True)
+        print(sensor, points_sensor.shape)
+        # filter points with sqrt(x^2 + y^2) <1
+        points_sensor = points_sensor[points_sensor[:,0]**2 + points_sensor[:,1]**2 < 1]
+        print(sensor, points_sensor.shape)
+    
+
 
 if __name__ == "__main__":
     # ouster_angles_keep, lines_kept = downsample_ouster_to_hesai()
@@ -370,6 +474,9 @@ if __name__ == "__main__":
     # print(lines_kept)
 
     # get_and_draw_intensity_statistic()
-    rename_seq_lab()
+    # rename_seq_lab()
+
+    density_statistic()
+    # density_stat()
 
 

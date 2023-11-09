@@ -60,8 +60,8 @@ class XMechanismUnmanned(DatasetTemplate):
 
         # training or testing
         self.split = self.dataset_cfg.DATA_SPLIT[self.mode]
-        self.split_file = os.path.join(self.root_path, 'ImageSets', self.split + '_top_2_percent.txt')
-        #self.split_file = os.path.join(self.root_path, 'ImageSets', self.split + '_last_90_percent.txt')
+        #self.split_file = os.path.join(self.root_path, 'ImageSets', self.split + '_top_2_percent.txt')
+        self.split_file = os.path.join(self.root_path, 'ImageSets', self.split + '_last_90_percent.txt')
         self.sample_seq_list = [x.strip() for x in open(self.split_file).readlines()]
         self.sample_idx_list = [{'seq': seq, 'frame_id': frame_id} for seq in self.sample_seq_list for frame_id in range(200)]
 
@@ -264,8 +264,8 @@ class XMechanismUnmanned(DatasetTemplate):
             root_path=self.root_path, logger=self.logger
         )
         self.split = split
-        split_dir = os.path.join(self.root_path, 'ImageSets', self.split+'_top_2_percent.txt')
-        #split_dir = os.path.join(self.root_path, 'ImageSets', self.split+'_last_90_percent.txt')
+        #split_dir = os.path.join(self.root_path, 'ImageSets', self.split+'_top_2_percent.txt')
+        split_dir = os.path.join(self.root_path, 'ImageSets', self.split+'_last_90_percent.txt')
         self.sample_seq_list = [x.strip() for x in open(split_dir).readlines()]
     def __len__(self):
         if self._merge_all_iters_to_one_epoch:
@@ -568,8 +568,8 @@ class XMechanismUnmanned(DatasetTemplate):
         print('len info when create gt_database: ', len(infos))
         # print('info when create gt_database: ', infos)
         for sensor in sensors:
-            database_save_path = Path(self.root_path) / ('top_2_percent_gt_database_%s' % sensor if split == 'train' else 'top_2_percent_gt_database_%s_%s' % (self.sensor, split))
-            db_info_save_path = Path(self.root_path) / ('top_2_percent_gt_database_info_%s.pkl' % sensor if split == 'train' else 'top_2_percent_gt_database_info_%s_%s.pkl' % (self.sensor, split))
+            database_save_path = Path(self.root_path) / ('last_90_percent_gt_database_%s' % sensor if split == 'train' else 'last_90_percent_gt_database_%s_%s' % (self.sensor, split))
+            db_info_save_path = Path(self.root_path) / ('last_90_percent_gt_database_info_%s.pkl' % sensor if split == 'train' else 'last_90_percent_gt_database_info_%s_%s.pkl' % (self.sensor, split))
 
             database_save_path.mkdir(parents=True, exist_ok=True)
             all_db_infos = {}
@@ -643,8 +643,8 @@ def create_xmu_infos(dataset_cfg, class_names, data_path, save_path, workers=4):
     sensors = ['robosense', 'ouster', 'hesai']
 
     for sensor in sensors:
-        #train_filename = os.path.join(save_path, 'last_90_percent_xmu_%s_infos_%s.pkl'%(sensor,train_split))
-        train_filename = os.path.join(save_path, 'top_2_percent_xmu_infos_%s.pkl'%train_split)
+        train_filename = os.path.join(save_path, 'last_90_percent_xmu_%s_infos_%s.pkl'%(sensor,train_split))
+        #train_filename = os.path.join(save_path, 'top_2_percent_xmu_infos_%s.pkl'%train_split)
     # val_filename = os.path.join(save_path,   'top_10_percent_xmu_infos_%s.pkl'%val_split)
     # test_filename = os.path.join(save_path,  'top_10_percent_xmu_infos_%s.pkl'%test_split)
 

@@ -16,3 +16,9 @@ venv/
 output
 *.npy
 *.tar.gz
+*.png
+*.pcd
+*.npy
+try.py
+exp_area.py
+pcdet/datasets/xmu/xmu_dataset_semi.py
