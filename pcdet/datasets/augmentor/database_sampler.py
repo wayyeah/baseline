@@ -5,7 +5,7 @@ import copy
 import numpy as np
 import SharedArray
 import torch.distributed as dist
-
+import pcdet.datasets.augmentor.sa_da_v2 as sa_da_v2
 from ...ops.iou3d_nms import iou3d_nms_utils
 from ...utils import box_utils, common_utils
 
@@ -243,6 +243,15 @@ class DataBaseSampler(object):
         sampled_gt_boxes = existed_boxes[gt_boxes.shape[0]:, :]
         if total_valid_sampled_dict.__len__() > 0:
             data_dict = self.add_sampled_boxes_to_scene(data_dict, sampled_gt_boxes, total_valid_sampled_dict)
-
+        
+       
+        if "fix" in data_dict.keys():
+           
+            #print("old:",data_dict['points'].shape)
+            data_dict['points']=sa_da_v2.pyramid_augment_v0(data_dict['gt_boxes'].reshape(-1,7), data_dict['points'],
+                                                    enable_sa_dropout=0.25,enable_sa_swap=[1,10]
+                                                    )
+            #print("new:",data_dict['points'].shape) 
+          
         data_dict.pop('gt_boxes_mask')
         return data_dict

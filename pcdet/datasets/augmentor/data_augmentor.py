@@ -202,7 +202,6 @@ class DataAugmentor(object):
         data_dict['gt_boxes'] = gt_boxes
         data_dict['points'] = points
         return data_dict
-
     def forward(self, data_dict):
         """
         Args:
@@ -214,6 +213,7 @@ class DataAugmentor(object):
 
         Returns:
         """
+        
         for cur_augmentor in self.data_augmentor_queue:
             data_dict = cur_augmentor(data_dict=data_dict)
 
@@ -233,3 +233,4 @@ class DataAugmentor(object):
 
             data_dict.pop('gt_boxes_mask')
         return data_dict
+    

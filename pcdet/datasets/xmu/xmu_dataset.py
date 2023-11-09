@@ -93,7 +93,7 @@ class XMechanismUnmanned(DatasetTemplate):
         self.sample_idx_list = [{'seq': seq, 'frame_id': frame_id} for seq in self.sample_seq_list for frame_id in range(200)]
 
         self.xmu_infos = [] # using a list to store
-
+        
         # 这是一个用来存储所有 数据的列表，有这个是为了方便后面的数据读取
         # 之所以把它弄成pkl更是为了不用每次都去读取数据，这样可以加快训练速度
         self.include_xmu_data(self.mode)
@@ -406,15 +406,25 @@ class XMechanismUnmanned(DatasetTemplate):
                 boxes_7DoF = boxes_7DoF[existance]
                 classes = classes[existance]
         
-    
-        input_dict = {
+        if self.dataset_cfg.get('FIX', False):
+            input_dict = {
             # 'db_flag': "xmu_%s" % self.sensor,
             'frame_id': self.sample_idx_list[index],
             'points': points,
             'calib': self.get_calib(idx=idx, sensor=self.sensor),
             'gt_boxes': boxes_7DoF,
             'gt_names': classes,
+            'fix': True
         }
+        else:
+            input_dict = {
+                # 'db_flag': "xmu_%s" % self.sensor,
+                'frame_id': self.sample_idx_list[index],
+                'points': points,
+                'calib': self.get_calib(idx=idx, sensor=self.sensor),
+                'gt_boxes': boxes_7DoF,
+                'gt_names': classes,
+            }
 
         data_dict = self.prepare_data(input_dict)
 

@@ -96,7 +96,7 @@ for i in range(len(result)):
         if np.random.rand() < downsampe_prob:
             mask = np.random.rand(prob.shape[0]) < prob
             points = points[mask]
-        points=points[:,:4]
+    points=points[:,:4]
        
     
     annos =info

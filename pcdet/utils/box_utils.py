@@ -3,11 +3,49 @@ import scipy
 import torch
 import copy
 from scipy.spatial import Delaunay
-
+from pcdet.utils.box_np_ops import center_to_corner_box3d
+from pcdet.utils.geometry import points_in_convex_polygon_3d_jit
 from ..ops.roiaware_pool3d import roiaware_pool3d_utils
 from . import common_utils
 
-
+def get_pyramids(gt_boxes):
+    pyramid_orders = np.array([
+        [0, 1, 5, 4],
+        [4, 5, 6, 7],
+        [7, 6, 2, 3],
+        [3, 2, 1, 0],
+        [1, 2, 6, 5],
+        [0, 4, 7, 3]
+    ])
+    boxes_corners = center_to_corner_box3d(gt_boxes[:, 0:3], gt_boxes[:, 3:6], gt_boxes[:, 6], \
+                                                      origin=[0.5, 0.5, 0.5], axis=2).reshape(-1, 24)
+    pyramid_list = []
+    for order in pyramid_orders:
+        # frustum polygon: 5 corners, 5 surfaces
+        pyramid = np.concatenate((gt_boxes[:, 0:3],
+                                  boxes_corners[:, 3*order[0] : 3*order[0]+3],
+                                  boxes_corners[:, 3*order[1] : 3*order[1]+3],
+                                  boxes_corners[:, 3*order[2] : 3*order[2]+3],
+                                  boxes_corners[:, 3*order[3] : 3*order[3]+3]), axis=1)
+        pyramid_list.append(pyramid[:, None, :])
+    pyramids = np.concatenate(pyramid_list, axis=1) # [N, 6, 15], 15=5*3
+    return pyramids
+def one_hot(x, num_class=None):
+    if not num_class:
+        num_class = np.max(x) + 1
+    ohx = np.zeros((len(x), num_class))
+    ohx[range(len(x)), x] = 1
+    return ohx
+def points_in_pyramids_mask(points, pyramids):
+    '''
+    pyramids: [N', 15]
+    surfaces: [N', 5, 3, 3]
+               N': num of pyramids, '5: num of surfaces per pyramid, 3: num of corners per surface, 3: dim of each corner
+    '''
+    indices = [1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 0, 4, 3, 2]
+    surfaces = np.concatenate([pyramids[:, 3*k : 3*k+3] for k in indices], axis=1).reshape(-1, 5, 3, 3)
+    point_masks = points_in_convex_polygon_3d_jit(points[:, :3], surfaces)
+    return point_masks
 def in_hull(p, hull):
     """
     :param p: (N, K) test points
