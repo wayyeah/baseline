@@ -1,17 +1,17 @@
 CLASS_NAMES: ['Car', 'Truck', 'Pedestrian', 'Cyclist']
 
 DATA_CONFIG:
-    _BASE_CONFIG_: cfgs/dataset_configs/xmu/xmu_dataset_robosense.yaml
+    _BASE_CONFIG_: cfgs/dataset_configs/xmu/xmu_dataset_ouster.yaml
     POINT_CLOUD_RANGE: [0, -70.4, -2, 70.4, 70.4, 4]
     BOX_COX_NORM_INTENSITY: True
-    DISTANCE_BEAM_DOWNSAMPLE: True
+    ROBOSENSE_TO_OUTSTER_DOWNSAMPLE: True
     DATA_AUGMENTOR:
         DISABLE_AUG_LIST: [ 'random_world_rotation']
         AUG_CONFIG_LIST:
         - NAME: gt_sampling
           USE_ROAD_PLANE: False
           DB_INFO_PATH:
-              - pseudo_gt_database_info_robosense2hesai_ours.pkl
+              - pseudo_gt_database_info_ouster2robosense_ours.pkl
           PREPARE: {
             filter_by_min_points: ['Car:20', 'Truck:20', 'Pedestrian:15', 'Cyclist:15'],
           }
