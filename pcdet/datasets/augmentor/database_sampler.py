@@ -42,12 +42,12 @@ class DataBaseSampler(object):
                     db_info_path = self.root_path.resolve() / db_info_path
                     with open(str(db_info_path), 'rb') as f:
                         infos = pickle.load(f)
-                        [self.db_tar_infos[cur_class].extend(infos[cur_class][:int(len(infos)*(epoch/40))]) for cur_class in class_names]
+                        [self.db_infos[cur_class].extend(infos[cur_class][:int(len(infos[cur_class])*(epoch/40))]) for cur_class in class_names]
                     for cur_class in class_names:
-                        target_len+=int(len(infos)*(epoch/40))
+                        target_len+=int(len(infos[cur_class])*(epoch/40))
                 print("target len:",target_len)   
             print("gt sampling fix")    
-                
+        
         for func_name, val in sampler_cfg.PREPARE.items():
             self.db_infos = getattr(self, func_name)(self.db_infos, val)
         
