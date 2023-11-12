@@ -213,25 +213,41 @@ class XMechanismUnmanned(DatasetTemplate):
         lidar_file_list.sort() #一定要sort，不然顺序不对
 
         lidar_file = os.path.join(self.root_path, 'seq'+seq, sensor, lidar_file_list[int(frame)])
-
         assert Path(lidar_file).exists(), "lidar file %s not exists."%lidar_file
         assert num_features==4, 'only support xyzi currently'
-        lidar = pypcd.PointCloud.from_path(lidar_file)
-        pc_x = lidar.pc_data['x']
-        pc_y = lidar.pc_data['y']
-        pc_z = lidar.pc_data['z']
-        pc_i = lidar.pc_data['intensity']
-        pc_ring = lidar.pc_data['ring']
-        # for intensity
-        if self.dataset_cfg.get('BOX_COX_NORM_INTENSITY', False):
-            # box_cox_lambda = {'ouster':0.529603806963828, 'hesai':0.5931315699272153, 'robosense':0.4900647247193385}
-            box_cox_lambda = {'ouster': 0.5194996882001862, 'hesai': 0.592819354971455, 'robosense': 0.5432802611595038}
-            pc_i = np.log(pc_i + 1)
-            pc_i = stats.boxcox(pc_i+1e-6, box_cox_lambda[sensor])
-            # normalize to [0, 1]
-            pc_i = ((pc_i - np.mean(pc_i))/ np.std(pc_i)) * (np.max(pc_i) - np.min(pc_i)) + np.min(pc_i)
-
-        lidar = np.stack([pc_x, pc_y, pc_z, pc_i, pc_ring], axis=1)
+        if sensor=='gpal':
+            lidar_file = os.path.join("/home/xmu/datasets/XMechanismUnmanned_gpalcsv", 'seq'+seq, sensor, lidar_file_list[int(frame)])
+            lidar_file=lidar_file.replace('.pcd', '.npy')
+            assert Path(lidar_file).exists(), "lidar file %s not exists."%lidar_file
+            lidar=np.load(lidar_file) # (N, 6)
+            lidar =lidar[:,:4] 
+          
+            if self.dataset_cfg.get('BOX_COX_NORM_INTENSITY', False):
+                # box_cox_lambda = {'ouster':0.529603806963828, 'hesai':0.5931315699272153, 'robosense':0.4900647247193385}
+                box_cox_lambda = {'ouster': 0.5194996882001862, 'hesai': 0.592819354971455, 'robosense': 0.5432802611595038, 'gpal': -2.566459336282151}
+                pc_i=lidar[:,3]
+                pc_i = np.log(pc_i + 1)
+                pc_i = stats.boxcox(pc_i+1e-6, box_cox_lambda[sensor])
+                # normalize to [0, 1]
+                pc_i = ((pc_i - np.mean(pc_i))/ np.std(pc_i)) * (np.max(pc_i) - np.min(pc_i)) + np.min(pc_i)
+                lidar[:,3]=pc_i
+        else:
+            lidar = pypcd.PointCloud.from_path(lidar_file)
+            pc_x = lidar.pc_data['x']
+            pc_y = lidar.pc_data['y']
+            pc_z = lidar.pc_data['z']
+            pc_i = lidar.pc_data['intensity']
+            pc_ring = lidar.pc_data['ring']
+            # for intensity
+            if self.dataset_cfg.get('BOX_COX_NORM_INTENSITY', False):
+                # box_cox_lambda = {'ouster':0.529603806963828, 'hesai':0.5931315699272153, 'robosense':0.4900647247193385}
+                box_cox_lambda = {'ouster': 0.5194996882001862, 'hesai': 0.592819354971455, 'robosense': 0.5432802611595038}
+                pc_i = np.log(pc_i + 1)
+                pc_i = stats.boxcox(pc_i+1e-6, box_cox_lambda[sensor])
+                # normalize to [0, 1]
+                pc_i = ((pc_i - np.mean(pc_i))/ np.std(pc_i)) * (np.max(pc_i) - np.min(pc_i)) + np.min(pc_i)
+            
+            lidar = np.stack([pc_x, pc_y, pc_z, pc_i, pc_ring], axis=1)
 
         to_ego = True
         if to_ego:
@@ -246,9 +262,9 @@ class XMechanismUnmanned(DatasetTemplate):
         if sensor == 'ouster' or sensor == 'robosense':
             if self.dataset_cfg.get('DISTANCE_BEAM_DOWNSAMPLE', False):
                 lines_kept = [18,21,24,27,30,32,35,38, \
-                              41,44,47,49,52,55,58,61, \
-                              64,66,69,72,75,78,80,83, \
-                              86,89,92,95,97,100,103,106]
+                            41,44,47,49,52,55,58,61, \
+                            64,66,69,72,75,78,80,83, \
+                            86,89,92,95,97,100,103,106]
                 mask_line= np.isin(lidar[:, 4], lines_kept)
                 distance = np.sqrt(np.sum(lidar[:, :2]**2, axis=1))
                 # generate sampling probability
@@ -287,14 +303,12 @@ class XMechanismUnmanned(DatasetTemplate):
                         downsampled_points.append(line_points)
                 downsampled_points = np.vstack(downsampled_points)
                 lidar = downsampled_points
-                
-           
-                
+                    
         # filter nan
         lidar = lidar[~np.isnan(lidar).any(axis=1)]
         lidar = lidar[:, :4]
         
-         #裁切点云
+        #裁切点云
         radius_range = [0, 150]  # 半径范围
         angle_range = [-np.pi / 3, np.pi / 3]  # 60度到负60度，转换为弧度
         cropped_points = crop_sector(lidar, radius_range, angle_range)
@@ -651,7 +665,7 @@ class XMechanismUnmanned(DatasetTemplate):
         import torch
         assert split in ['train', 'val', 'test']
         if not sensor:
-            sensors = ['robosense', 'ouster', 'hesai']
+            sensors = ['robosense', 'ouster', 'hesai','gpal']
         with open(info_path, 'rb') as f:
             infos = pickle.load(f)
         

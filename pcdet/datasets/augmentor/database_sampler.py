@@ -11,7 +11,7 @@ from ...utils import box_utils, common_utils
 
 
 class DataBaseSampler(object):
-    def __init__(self, root_path, sampler_cfg, class_names, logger=None):
+    def __init__(self, root_path, sampler_cfg, class_names, logger=None,epoch=None):
         self.root_path = root_path
         self.class_names = class_names
         self.sampler_cfg = sampler_cfg
@@ -19,15 +19,35 @@ class DataBaseSampler(object):
         self.db_infos = {}
         for class_name in class_names:
             self.db_infos[class_name] = []
-            
         self.use_shared_memory = sampler_cfg.get('USE_SHARED_MEMORY', False)
-        
-        for db_info_path in sampler_cfg.DB_INFO_PATH:
-            db_info_path = self.root_path.resolve() / db_info_path
-            with open(str(db_info_path), 'rb') as f:
-                infos = pickle.load(f)
-                [self.db_infos[cur_class].extend(infos[cur_class]) for cur_class in class_names]
-
+        if(epoch is  None ):
+            for db_info_path in sampler_cfg.DB_INFO_PATH:
+                db_info_path = self.root_path.resolve() / db_info_path
+                with open(str(db_info_path), 'rb') as f:
+                    infos = pickle.load(f)
+                    [self.db_infos[cur_class].extend(infos[cur_class]) for cur_class in class_names]
+        else:
+            source_len=0
+            for db_info_path in sampler_cfg.DB_INFO_PATH:
+                db_info_path = self.root_path.resolve() / db_info_path
+                with open(str(db_info_path), 'rb') as f:
+                    infos = pickle.load(f)
+                    [self.db_infos[cur_class].extend(infos[cur_class][:len(infos[cur_class])-int(len(infos[cur_class])*(epoch/40))]) for cur_class in class_names]
+                for cur_class in class_names:
+                    source_len+=len(infos[cur_class])-int(len(infos[cur_class])*(epoch/40))
+                print("source len:",source_len)
+            target_len=0
+            if sampler_cfg.get("DB_TAR_INFO_PATH",None):
+                for db_info_path in sampler_cfg.DB_TAR_INFO_PATH:
+                    db_info_path = self.root_path.resolve() / db_info_path
+                    with open(str(db_info_path), 'rb') as f:
+                        infos = pickle.load(f)
+                        [self.db_tar_infos[cur_class].extend(infos[cur_class][:int(len(infos)*(epoch/40))]) for cur_class in class_names]
+                    for cur_class in class_names:
+                        target_len+=int(len(infos)*(epoch/40))
+                print("target len:",target_len)   
+            print("gt sampling fix")    
+                
         for func_name, val in sampler_cfg.PREPARE.items():
             self.db_infos = getattr(self, func_name)(self.db_infos, val)
         

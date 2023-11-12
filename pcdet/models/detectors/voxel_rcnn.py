@@ -10,7 +10,7 @@ class VoxelRCNN(Detector3DTemplate):
         for cur_module in self.module_list:
             batch_dict = cur_module(batch_dict)
         """ import numpy   as np
-        np.save("/home/xmu/projects/xmuda/baseline/old_points.npy", batch_dict["old_points"].detach().cpu().numpy())
+        #np.save("/home/xmu/projects/xmuda/baseline/old_points.npy", batch_dict["old_points"].detach().cpu().numpy())
         np.save("/home/xmu/projects/xmuda/baseline/points.npy", batch_dict["points"].detach().cpu().numpy())
         np.save("/home/xmu/projects/xmuda/baseline/gt_boxes.npy", batch_dict["gt_boxes"].detach().cpu().numpy())
         exit() """
