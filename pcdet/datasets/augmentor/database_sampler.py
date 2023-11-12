@@ -32,20 +32,24 @@ class DataBaseSampler(object):
                 db_info_path = self.root_path.resolve() / db_info_path
                 with open(str(db_info_path), 'rb') as f:
                     infos = pickle.load(f)
-                    [self.db_infos[cur_class].extend(infos[cur_class][:len(infos[cur_class])-int(len(infos[cur_class])*(epoch/40))]) for cur_class in class_names]
-                for cur_class in class_names:
-                    source_len+=len(infos[cur_class])-int(len(infos[cur_class])*(epoch/40))
-                print("source len:",source_len)
+                    if sampler_cfg.get("REVERSE",None):
+                        [self.db_infos[cur_class].extend(infos[cur_class][:int(len(infos[cur_class])*(epoch/40))]) for cur_class in class_names]
+                    else:    
+                        [self.db_infos[cur_class].extend(infos[cur_class][:len(infos[cur_class])-int(len(infos[cur_class])*(epoch/40))]) for cur_class in class_names]
+                
             target_len=0
             if sampler_cfg.get("DB_TAR_INFO_PATH",None):
                 for db_info_path in sampler_cfg.DB_TAR_INFO_PATH:
                     db_info_path = self.root_path.resolve() / db_info_path
                     with open(str(db_info_path), 'rb') as f:
                         infos = pickle.load(f)
-                        [self.db_infos[cur_class].extend(infos[cur_class][:int(len(infos[cur_class])*(epoch/40))]) for cur_class in class_names]
-                    for cur_class in class_names:
-                        target_len+=int(len(infos[cur_class])*(epoch/40))
-                print("target len:",target_len)   
+                        if sampler_cfg.get("REVERSE",None):
+                            [self.db_infos[cur_class].extend(infos[cur_class][:len(infos[cur_class])-int(len(infos[cur_class])*(epoch/40))]) for cur_class in class_names]
+                    
+                        else:
+                            [self.db_infos[cur_class].extend(infos[cur_class][:int(len(infos[cur_class])*(epoch/40))]) for cur_class in class_names]
+                    
+                  
             print("gt sampling fix")    
         
         for func_name, val in sampler_cfg.PREPARE.items():
