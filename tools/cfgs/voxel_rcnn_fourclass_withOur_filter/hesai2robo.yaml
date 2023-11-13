@@ -16,7 +16,7 @@ DATA_CONFIG:
           PREPARE: {
             filter_by_min_points: ['Car:75', 'Truck:50', 'Pedestrian:15', 'Cyclist:20'],
           }
-          SAMPLE_GROUPS: ['Car:20', 'Truck:20', 'Pedestrian:15', 'Cyclist:15']
+          SAMPLE_GROUPS: ['Car:40', 'Truck:40', 'Pedestrian:25', 'Cyclist:25']
           NUM_POINT_FEATURES: 4
           DATABASE_WITH_FAKELIDAR: False
           REMOVE_EXTRA_WIDTH: [0.0, 0.0, 0.0]
