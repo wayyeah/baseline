@@ -14,7 +14,7 @@ for key in info.keys():
     #num_points_in_gt=info[key]['num_points_in_gt']
     num=np.array(num)
     # 统计num_points_in_gt分布情况
-    print(key," points num<75:",num[num<75].shape[0])
+    print(key," points num<75:",num[num<100].shape[0])
     print(key," points num<200:",num[num<200].shape[0])
     print(key," points num<300:",num[num<300].shape[0])
     print(key," points num<400:",num[num<400].shape[0])
