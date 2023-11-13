@@ -3,6 +3,7 @@ CLASS_NAMES: ['Car', 'Truck', 'Pedestrian', 'Cyclist']
 DATA_CONFIG:
     _BASE_CONFIG_: cfgs/dataset_configs/xmu/xmu_dataset_hesai.yaml
     POINT_CLOUD_RANGE: [0, -70.4, -2, 70.4, 70.4, 4]
+    BOX_COX_NORM_INTENSITY: True
     DATA_AUGMENTOR:
         DISABLE_AUG_LIST: [ 'random_world_rotation']
         AUG_CONFIG_LIST:

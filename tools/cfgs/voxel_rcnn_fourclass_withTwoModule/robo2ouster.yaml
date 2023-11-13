@@ -11,7 +11,7 @@ DATA_CONFIG:
         - NAME: gt_sampling
           USE_ROAD_PLANE: False
           DB_INFO_PATH:
-              - gt_database_info_robosense_70.4.pkl
+              - gt_database_info_robosense2ouster_2modules.pkl
           PREPARE: {
             filter_by_min_points: ['Car:20', 'Truck:20', 'Pedestrian:15', 'Cyclist:15'],
           }
