@@ -20,6 +20,8 @@ class DataBaseSampler(object):
         for class_name in class_names:
             self.db_infos[class_name] = []
         self.use_shared_memory = sampler_cfg.get('USE_SHARED_MEMORY', False)
+        if sampler_cfg.get("DB_TAR_INFO_PATH",None) is None:
+            epoch=None
         if(epoch is  None ):
             for db_info_path in sampler_cfg.DB_INFO_PATH:
                 db_info_path = self.root_path.resolve() / db_info_path

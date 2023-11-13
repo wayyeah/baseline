@@ -112,9 +112,9 @@ def train_model(model, optimizer, train_loader, model_func, lr_scheduler, optim_
             # add for gradually augment
             assert hasattr(train_loader.dataset, 'set_cur_epoch')
             train_loader.dataset.set_cur_epoch(cur_epoch=cur_epoch)
-            if (cur_epoch)>=10:
+            if (cur_epoch)>=5:#>=10
                 train_loader.dataset.data_augmentor.gt_sampling=partial(database_sampler.DataBaseSampler(root_path=train_loader.dataset.data_augmentor.data_augmentor_queue[0].root_path,sampler_cfg= train_loader.dataset.data_augmentor.data_augmentor_queue[0].sampler_cfg,class_names=train_loader.dataset.data_augmentor.data_augmentor_queue[0].class_names,logger=train_loader.dataset.data_augmentor.data_augmentor_queue[0].logger,epoch=cur_epoch))
-       
+           
             accumulated_iter = train_one_epoch(
                 model, optimizer, train_loader, model_func,
                 lr_scheduler=cur_scheduler,

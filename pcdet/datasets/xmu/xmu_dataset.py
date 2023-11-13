@@ -238,6 +238,7 @@ class XMechanismUnmanned(DatasetTemplate):
             pc_z = lidar.pc_data['z']
             pc_i = lidar.pc_data['intensity']
             pc_ring = lidar.pc_data['ring']
+           
             # for intensity
             if self.dataset_cfg.get('BOX_COX_NORM_INTENSITY', False):
                 # box_cox_lambda = {'ouster':0.529603806963828, 'hesai':0.5931315699272153, 'robosense':0.4900647247193385}
@@ -306,13 +307,25 @@ class XMechanismUnmanned(DatasetTemplate):
                     
         # filter nan
         lidar = lidar[~np.isnan(lidar).any(axis=1)]
-        lidar = lidar[:, :4]
+        
         
         #裁切点云
         radius_range = [0, 150]  # 半径范围
         angle_range = [-np.pi / 3, np.pi / 3]  # 60度到负60度，转换为弧度
         cropped_points = crop_sector(lidar, radius_range, angle_range)
         lidar=cropped_points
+        if self.dataset_cfg.get('MOD4', False):
+            if sensor=='robosense':
+                vertical_fov = 25.0  # 垂直视场角度
+                vertical_resolution = 0.2  # 垂直角分辨率
+            
+                line_indices = get_line_indices(lidar[:,:3], vertical_fov, vertical_resolution)
+                mask=(line_indices%4==0)
+            elif sensor=='ouster':
+                mask=(lidar[:,4]%4==0)
+            lidar=lidar[mask]
+            #print("cut")    
+        lidar = lidar[:, :4]
         return lidar
 
     def downsample_ouster_to_hesai(self, points, rings):
