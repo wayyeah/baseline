@@ -10,7 +10,7 @@ DATA_CONFIG:
         - NAME: gt_sampling
           USE_ROAD_PLANE: False
           DB_INFO_PATH:
-              - gt_database_info_hesai_70.4.pkl
+              - gt_database_info_hesai_2modules.pkl
           DB_TAR_INFO_PATH:
               - pseudo_gt_database_info_hesai2robosense_ours.pkl
           PREPARE: {
