@@ -13,7 +13,7 @@ class VoxelRCNN(Detector3DTemplate):
         #np.save("/home/xmu/projects/xmuda/baseline/old_points.npy", batch_dict["old_points"].detach().cpu().numpy())
         np.save("/home/xmu/projects/xmuda/baseline/points.npy", batch_dict["points"].detach().cpu().numpy())
         np.save("/home/xmu/projects/xmuda/baseline/gt_boxes.npy", batch_dict["gt_boxes"].detach().cpu().numpy())
-        exit() """
+        #exit() """
         if self.training:
             loss, tb_dict, disp_dict = self.get_training_loss()
 

@@ -247,6 +247,7 @@ class DataBaseSampler(object):
             if self.limit_whole_scene:
                 num_gt = np.sum(class_name == gt_names)
                 sample_group['sample_num'] = str(int(self.sample_class_num[class_name]) - num_gt)
+                
             if int(sample_group['sample_num']) > 0:
                 sampled_dict = self.sample_with_fixed_number(class_name, sample_group)
 
@@ -278,6 +279,7 @@ class DataBaseSampler(object):
                                                     enable_sa_dropout=0.25,enable_sa_swap=[1,10]
                                                     )
             #print("new:",data_dict['points'].shape) 
+            print("6 fix")
           
         data_dict.pop('gt_boxes_mask')
         return data_dict
