@@ -6,6 +6,12 @@ import os
 import re
 import time
 from pathlib import Path
+from numba import cuda
+import warnings
+from numba.core.errors import NumbaPerformanceWarning
+
+# Suppress only NumbaPerformanceWarning
+warnings.filterwarnings('ignore', category=NumbaPerformanceWarning)
 
 import numpy as np
 import torch

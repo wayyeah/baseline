@@ -2,6 +2,12 @@ import _init_path
 import argparse
 import datetime
 import glob
+from numba import cuda
+import warnings
+from numba.core.errors import NumbaPerformanceWarning
+
+# Suppress only NumbaPerformanceWarning
+warnings.filterwarnings('ignore', category=NumbaPerformanceWarning)
 
 from pathlib import Path
 from test import repeat_eval_ckpt
