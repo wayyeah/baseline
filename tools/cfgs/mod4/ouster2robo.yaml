@@ -3,17 +3,17 @@ CLASS_NAMES: ['Car', 'Truck', 'Pedestrian', 'Cyclist']
 DATA_CONFIG:
     _BASE_CONFIG_: cfgs/dataset_configs/xmu/xmu_dataset_ouster.yaml
     POINT_CLOUD_RANGE: [0, -70.4, -2, 70.4, 70.4, 4]
-    MOD4: True
-    BOX_COX_NORM_INTENSITY: True
+    OUSTER_TO_ROBO: True 
     DATA_AUGMENTOR:
         DISABLE_AUG_LIST: [ 'random_world_rotation']
         AUG_CONFIG_LIST:
         - NAME: gt_sampling
           USE_ROAD_PLANE: False
           DB_INFO_PATH:
-              - gt_database_info_ouster_2modules.pkl
+              - gt_database_info_ouster2robo_mod126.pkl
+         
           PREPARE: {
-            filter_by_min_points: ['Car:20', 'Truck:20', 'Pedestrian:15', 'Cyclist:15'],
+             filter_by_min_points: ['Car:5', 'Truck:5', 'Pedestrian:5', 'Cyclist:5'],
           }
           SAMPLE_GROUPS: ['Car:20', 'Truck:20', 'Pedestrian:15', 'Cyclist:15']
           NUM_POINT_FEATURES: 4
