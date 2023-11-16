@@ -247,7 +247,18 @@ class XMechanismUnmanned(DatasetTemplate):
                 pc_i = stats.boxcox(pc_i+1e-6, box_cox_lambda[sensor])
                 # normalize to [0, 1]
                 pc_i = ((pc_i - np.mean(pc_i))/ np.std(pc_i)) * (np.max(pc_i) - np.min(pc_i)) + np.min(pc_i)
-            
+            # for ouster t robo
+            if self.dataset_cfg.get('OUSTER_TO_ROBO', False):
+                import random
+                random_numbers = random.sample(range(128), 126)
+                mask = np.isin(pc_ring, random_numbers)
+
+                pc_x=pc_x[mask]
+                pc_y=pc_y[mask]
+                pc_z=pc_z[mask]
+                pc_i=pc_i[mask]
+                pc_ring=pc_ring[mask]
+
             lidar = np.stack([pc_x, pc_y, pc_z, pc_i, pc_ring], axis=1)
 
         to_ego = True

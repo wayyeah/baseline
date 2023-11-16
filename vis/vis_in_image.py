@@ -360,8 +360,9 @@ def scene_visulization():
     color_robosense = (128,0,128)
     color_gpal = (255,0,0)
 
-    seq = '35'
-    for frame in range(50, 200):
+    seq = '21'
+
+    for frame in range(5, 15):
         # draw for each sensor
         for sensor in sensor_list:
             trans_mat = np.loadtxt('./proj_trans_to_server/transformation_matrix_%s.txt'%sensor)
@@ -379,16 +380,16 @@ def scene_visulization():
             # intensity to rgb
             points_u[:, 3:] = intensity_to_rgb(points_u[:, 3])
             # print(root + '/seq35/camera_front/')
-            img_path_list = os.listdir(root + '/seq35/camera_front/')
+            img_path_list = os.listdir(root + '/seq%s/camera_front/'%seq)
             img_path_list.sort()
             # print(img_path_list)
-            img_path = root + '/seq35/camera_front/' + img_path_list[frame]
+            img_path = root + '/seq%s/camera_front/'%seq + img_path_list[frame]
             img = cv2.imread(img_path)
             img = draw_pc2image(img, points_u_2d, points_u[:, 3:],sensor=sensor)
-            write_path = './proj_35'
+            write_path = './proj_%s'%seq
             if not os.path.exists(write_path):
                 os.makedirs(write_path)
-            cv2.imwrite('./proj_35/image_%d_%s.png'%(frame, sensor), img)
+            cv2.imwrite('./proj_%s/image_%d_%s.png'%(seq, frame, sensor), img)
             print('done %d for sensor %s'%(frame, sensor))
 
         # points_all = []
@@ -446,14 +447,17 @@ def intensity_to_rgb(intensity):
 
 def get_vis_sample_to_npy():
     sensors = ['ouster', 'robosense', 'hesai', 'gpal']
-    for sensor in sensors:
-        points = get_lidar_o({'seq': '35', 'frame': '0081'}, sensor)
-        save_path = r'./vis_sample/'
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
-        np.save(save_path + sensor + '.npy', points)
-        print('done %s'%sensor)
+    idxs = [{'seq': '12', 'frame': '0046'}, {'seq': '21', 'frame': '0010'},{'seq': '35', 'frame': '0081'}]
+    for idx in idxs:
+        for sensor in sensors:
+            points = get_lidar_o(idx, sensor)
+            save_path = r'./vis_sample/'
+            if not os.path.exists(save_path):
+                os.makedirs(save_path)
+            np.save(save_path + sensor + idx['seq']+'_'+idx['frame'] + '.npy', points)
+            print('done %s'%sensor)
+        print('done %s'%idx['seq'])
 
 if __name__ == '__main__':
-    # scene_visulization()
-    get_vis_sample_to_npy()
+    scene_visulization()
+    # get_vis_sample_to_npy()
